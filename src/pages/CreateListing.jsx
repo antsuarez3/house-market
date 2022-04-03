@@ -6,13 +6,15 @@ import {
   uploadBytesResumable,
   getDownloadURL,
 } from 'firebase/storage'
-import db from '../firebase.config'
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
+import { db } from '../firebase.config'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'react-toastify'
 import { v4 as uuidv4 } from 'uuid'
 import Spinner from '../components/Spinner'
 
 function CreateListing() {
+  // eslint-disable-next-line
   const [geolocationEnabled, setGeolocationEnabled] = useState(true)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
@@ -70,6 +72,7 @@ function CreateListing() {
 
   const onSubmit = async (e) => {
     e.preventDefault()
+
     setLoading(true)
 
     if (discountedPrice >= regularPrice) {
@@ -104,13 +107,12 @@ function CreateListing() {
 
       if (location === undefined || location.includes('undefined')) {
         setLoading(false)
-        toast.error('Please enter a correct Address')
+        toast.error('Please enter a correct address')
         return
       }
     } else {
       geolocation.lat = latitude
       geolocation.lng = longitude
-      location = address
     }
 
     // Store image in firebase
@@ -162,9 +164,22 @@ function CreateListing() {
       return
     })
 
-    console.log(imgUrls)
+    const formDataCopy = {
+      ...formData,
+      imgUrls,
+      geolocation,
+      timestamp: serverTimestamp(),
+    }
 
+    formDataCopy.location = address
+    delete formDataCopy.images
+    delete formDataCopy.address
+    !formDataCopy.offer && delete formDataCopy.discountedPrice
+
+    const docRef = await addDoc(collection(db, 'listings'), formDataCopy)
     setLoading(false)
+    toast.success('Listing saved')
+    navigate(`/category/${formDataCopy.type}/${docRef.id}`)
   }
 
   const onMutate = (e) => {
